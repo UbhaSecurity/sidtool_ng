@@ -55,40 +55,40 @@ module Sidtool
       end
     end
 
-    ProgramChange = Struct.new(:channel, :program_number) do
-      def bytes
-        raise "Channel too big: #{channel}" if channel > 15
-        raise "Program number is too big: #{program_number}" if program_number > 255
-        [
-          0xC0 + channel,
-          program_number
-        ]
-      end
-    end
+ProgramChange = Struct.new(:channel, :program_number) do
+  def bytes
+    raise "Channel too big: #{channel}" if channel > 15
+    raise "Program number is too big: #{program_number}" if program_number > 127
+    [
+      0xC0 + channel,
+      program_number
+    ]
+  end
+end
 
-    NoteOn = Struct.new(:channel, :key) do
-      def bytes
-        raise "Channel too big: #{channel}" if channel > 15
-        raise "Key is too big: #{key}" if key > 255
-        [
-          0x90 + channel,
-          key,
-          40 # Default velocity
-        ]
-      end
-    end
+NoteOn = Struct.new(:channel, :key) do
+  def bytes
+    raise "Channel too big: #{channel}" if channel > 15
+    raise "Key is too big: #{key}" if key > 127
+    [
+      0x90 + channel,
+      key,
+      40 # Default velocity
+    ]
+  end
+end
 
-    NoteOff = Struct.new(:channel, :key) do
-      def bytes
-        raise "Channel too big: #{channel}" if channel > 15
-        raise "Key is too big: #{key}" if key > 255
-        [
-          0x80 + channel,
-          key,
-          40 # Default velocity
-        ]
-      end
-    end
+NoteOff = Struct.new(:channel, :key) do
+  def bytes
+    raise "Channel too big: #{channel}" if channel > 15
+    raise "Key is too big: #{key}" if key > 127
+    [
+      0x80 + channel,
+      key,
+      40 # Default velocity
+    ]
+  end
+end
 
     def initialize(synths_for_voices)
       @synths_for_voices = synths_for_voices
