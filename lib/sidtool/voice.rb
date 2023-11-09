@@ -117,6 +117,11 @@ module Sidtool
       440 * 2 ** ((midi_note - 69) / 12.0)
     end
 
+    def frequency_to_midi(frequency)
+      midi_note = 69 + 12 * Math.log2(frequency / 440.0)
+      midi_note.round
+    end
+
     def convert_attack(attack)
       case attack
       when 0 then 0.002
