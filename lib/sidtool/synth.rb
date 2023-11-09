@@ -5,6 +5,7 @@ module Sidtool
     attr_reader :sustain_length, :controls
     attr_accessor :release
 
+    # Constants for slide detection and handling
     SLIDE_THRESHOLD = 60 # Threshold for detecting slides
     SLIDE_DURATION_FRAMES = 20 # Duration over which to spread the slide
 
@@ -55,6 +56,14 @@ module Sidtool
 
     def tone
       sid_frequency_to_nearest_midi(@frequency)
+    end
+
+    def set_frequency_at_frame(frame, frequency)
+      return if frame < @start_frame
+
+      relative_frame = frame - @start_frame
+      midi_note = sid_frequency_to_nearest_midi(frequency)
+      @controls << [relative_frame, midi_note]
     end
 
     private
