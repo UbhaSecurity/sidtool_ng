@@ -7,8 +7,8 @@ module Sidtool
     def initialize
       @frequency_low = @frequency_high = 0
       @pulse_low = @pulse_high = 0
-      @attack_decay = @sustain_release = 0
       @control_register = 0
+      @attack_decay = @sustain_release = 0
       @current_synth = nil
       @synths = []
       @previous_midi_note = nil
@@ -92,12 +92,29 @@ module Sidtool
     end
 
     def handle_midi_note_change(midi_note)
-      # Implement logic for handling MIDI note changes, including slide detection
+      if slide_detected?(@previous_midi_note, midi_note)
+        handle_slide(@previous_midi_note, midi_note)
+      else
+        @current_synth.frequency = midi_to_frequency(midi_note)
+      end
     end
 
-    def frequency_to_midi(frequency)
-      midi_note = 69 + 12 * Math.log2(frequency / 440.0)
-      midi_note.round
+    def slide_detected?(prev_midi_note, new_midi_note)
+      return false unless prev_midi_note
+      (new_midi_note - prev_midi_note).abs > SLIDE_THRESHOLD
+    end
+
+    def handle_slide(start_midi, end_midi)
+      num_frames = SLIDE_DURATION_FRAMES
+      midi_increment = (end_midi - start_midi) / num_frames.to_f
+      (1..num_frames).each do |i|
+        midi_note = start_midi + midi_increment * i
+        @current_synth.set_frequency_at_frame(STATE.current_frame + i, midi_to_frequency(midi_note.round))
+      end
+    end
+
+    def midi_to_frequency(midi_note)
+      440 * 2 ** ((midi_note - 69) / 12.0)
     end
 
     def convert_attack(attack)
