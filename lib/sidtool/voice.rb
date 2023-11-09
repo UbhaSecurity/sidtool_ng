@@ -1,5 +1,9 @@
 module Sidtool
   class Voice
+   # Define the threshold for detecting slides and the duration for slide execution
+    SLIDE_THRESHOLD = 60 # Example value, adjust as needed
+    SLIDE_DURATION_FRAMES = 20 # Example value, adjust as needed
+
     attr_writer :frequency_low, :frequency_high, :pulse_low, :pulse_high
     attr_writer :control_register, :attack_decay, :sustain_release
     attr_reader :synths
