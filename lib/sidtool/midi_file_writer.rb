@@ -4,11 +4,16 @@ module Sidtool
       def bytes
         quantity = time
         seven_bit_segments = []
+        max_iterations = 100  # Safeguard against infinite loops
+        iterations = 0
+
         while true
           seven_bit_segments << (quantity & 127)
-          quantity = quantity >> 7
-          break if quantity == 0
+          quantity >>= 7
+          break if quantity == 0 || iterations >= max_iterations
+          iterations += 1
         end
+
         result = seven_bit_segments.reverse.map { |segment| segment | 128 }
         result[-1] &= 127
         result
@@ -17,7 +22,6 @@ module Sidtool
 
     TrackName = Struct.new(:name) do
       def bytes
-        puts "Debug: TrackName - Name=#{name}"
         [
           0xFF, 0x03,
           name.length,
@@ -28,7 +32,6 @@ module Sidtool
 
     TimeSignature = Struct.new(:numerator, :denominator_power_of_two, :clocks_per_metronome_click, :number_of_32th_nodes_per_24_clocks) do
       def bytes
-        puts "Debug: TimeSignature - Numerator=#{numerator}, DenominatorPowerOfTwo=#{denominator_power_of_two}, ClocksPerClick=#{clocks_per_metronome_click}, 32ndNotesPerBeat=#{number_of_32th_nodes_per_24_clocks}"
         [
           0xFF, 0x58, 0x04,
           numerator,
@@ -39,9 +42,8 @@ module Sidtool
       end
     end
 
-KeySignature = Struct.new(:sharps_or_flats, :is_major) do
+    KeySignature = Struct.new(:sharps_or_flats, :is_major) do
       def bytes
-        puts "Debug: KeySignature - SharpsOrFlats=#{sharps_or_flats}, IsMajor=#{is_major}"
         [
           0xFF, 0x59, 0x02,
           sharps_or_flats,
@@ -50,10 +52,8 @@ KeySignature = Struct.new(:sharps_or_flats, :is_major) do
       end
     end
 
-
     EndOfTrack = Struct.new(:nothing) do
       def bytes
-        puts "Debug: EndOfTrack"
         [
           0xFF, 0x2F, 0x00
         ]
@@ -62,7 +62,6 @@ KeySignature = Struct.new(:sharps_or_flats, :is_major) do
 
     ProgramChange = Struct.new(:channel, :program_number) do
       def bytes
-        puts "Debug: ProgramChange - Channel=#{channel}, ProgramNumber=#{program_number}"
         raise "Channel too big: #{channel}" if channel > 15
         raise "Program number is too big: #{program_number}" if program_number > 127
         [
@@ -72,31 +71,29 @@ KeySignature = Struct.new(:sharps_or_flats, :is_major) do
       end
     end
 
-NoteOn = Struct.new(:channel, :key) do
-  def bytes
-    puts "NoteOn: Channel=#{channel}, Key=#{key}"  # Debugging log
-    raise "Channel too big: #{channel}" if channel > 15
-    raise "Key is too big: #{key}" if key > 127
-    [
-      0x90 + channel,
-      key,
-      40 # Default velocity
-    ]
-  end
-end
+    NoteOn = Struct.new(:channel, :key) do
+      def bytes
+        raise "Channel too big: #{channel}" if channel > 15
+        raise "Key is too big: #{key}" if key > 127
+        [
+          0x90 + channel,
+          key,
+          40 # Default velocity
+        ]
+      end
+    end
 
-NoteOff = Struct.new(:channel, :key) do
-  def bytes
-    puts "NoteOff: Channel=#{channel}, Key=#{key}"  # Debugging log
-    raise "Channel too big: #{channel}" if channel > 15
-    raise "Key is too big: #{key}" if key > 127
-    [
-      0x80 + channel,
-      key,
-      40 # Default velocity
-    ]
-  end
-end
+    NoteOff = Struct.new(:channel, :key) do
+      def bytes
+        raise "Channel too big: #{channel}" if channel > 15
+        raise "Key is too big: #{key}" if key > 127
+        [
+          0x80 + channel,
+          key,
+          40 # Default velocity
+        ]
+      end
+    end
 
     def initialize(synths_for_voices)
       @synths_for_voices = synths_for_voices
@@ -111,39 +108,36 @@ end
       end
     end
 
-       def build_track(synths)
+    def build_track(synths)
       waveforms = [:tri, :saw, :pulse, :noise]
 
       track = []
       current_frame = 0
       synths.each do |synth|
         channel = waveforms.index(synth.waveform) || raise("Unknown waveform #{synth.waveform}")
-        puts "Debug: Channel=#{channel}, Start frame=#{synth.start_frame}, Current frame=#{current_frame}"
-        track << DeltaTime[synth.start_frame - current_frame]
-        track << NoteOn[channel, synth.tone]
-        puts "Debug: NoteOn - Channel=#{channel}, Key=#{synth.tone}"
+        track << DeltaTime.new(synth.start_frame - current_frame)
+        track << NoteOn.new(channel, synth.tone)
         current_frame = synth.start_frame
 
         current_tone = synth.tone
         synth.controls.each do |start_frame, tone|
-          track << DeltaTime[start_frame - current_frame]
-          track << NoteOff[channel, current_tone]
-          puts "Debug: NoteOff - Channel=#{channel}, Key=#{current_tone}"
-          track << DeltaTime[0]
-          track << NoteOn[channel, tone]
-          puts "Debug: NoteOn - Channel=#{channel}, Key=#{tone}"
+          track << DeltaTime.new(start_frame - current_frame)
+          track << NoteOff.new(channel, current_tone)
+          track << DeltaTime.new(0)
+          track << NoteOn.new(channel, tone)
           current_tone = tone
           current_frame = start_frame
         end
 
         end_frame = [current_frame, synth.start_frame + (FRAMES_PER_SECOND * (synth.attack + synth.decay + synth.sustain_length)).to_i].max
-        track << DeltaTime[end_frame - current_frame]
-        track << NoteOff[channel, current_tone]
-        puts "Debug: NoteOff - Channel=#{channel}, Key=#{current_tone}, End frame=#{end_frame}"
-
+        track << DeltaTime.new(end_frame - current_frame)
+        track << NoteOff.new(channel, current_tone)
         current_frame = end_frame
       end
-      track
+
+      # Optimization: Consolidate consecutive NoteOff and NoteOn events for the same tone
+      optimized_track = consolidate_events(track)
+      optimized_track
     end
 
     private
