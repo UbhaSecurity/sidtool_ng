@@ -141,6 +141,27 @@ module Sidtool
     end
 
     private
+
+    def consolidate_events(track)
+      consolidated = []
+      skip_next = false
+      track.each_with_index do |event, i|
+        if skip_next
+          skip_next = false
+          next
+        end
+
+        next_event = track[i + 1]
+        if event.is_a?(NoteOff) && next_event.is_a?(NoteOn) && event.key == next_event.key
+          # Skip the NoteOff and the next NoteOn as they cancel each other out
+          skip_next = true
+        else
+          consolidated << event
+        end
+      end
+      consolidated
+    end
+
     def write_header(file)
       # Type
       file << 'MThd'
