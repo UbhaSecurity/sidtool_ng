@@ -5,7 +5,7 @@ module Sidtool
     attr_reader :sustain_length, :controls
     attr_accessor :release
 
-    SLIDE_THRESHOLD = 5 # Threshold for detecting slides
+    SLIDE_THRESHOLD = 60 # Threshold for detecting slides
     SLIDE_DURATION_FRAMES = 20 # Duration over which to spread the slide
 
     def initialize(start_frame)
