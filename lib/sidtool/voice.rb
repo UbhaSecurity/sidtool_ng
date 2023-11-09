@@ -1,12 +1,7 @@
 module Sidtool
   class Voice
-    attr_writer :frequency_low
-    attr_writer :frequency_high
-    attr_writer :pulse_low
-    attr_writer :pulse_high
-    attr_writer :control_register
-    attr_writer :attack_decay
-    attr_writer :sustain_release
+    attr_writer :frequency_low, :frequency_high, :pulse_low, :pulse_high
+    attr_writer :control_register, :attack_decay, :sustain_release
     attr_reader :synths
 
     def initialize
@@ -16,28 +11,14 @@ module Sidtool
       @control_register = 0
       @current_synth = nil
       @synths = []
+      @previous_midi_note = nil
     end
 
     def finish_frame
       if gate
-        if @current_synth&.released?
-          @current_synth.stop!
-          @current_synth = nil
-        end
-
-        if frequency > 0
-          if !@current_synth
-            @current_synth = Synth.new(STATE.current_frame)
-            @synths << @current_synth
-          end
-          @current_synth.frequency = frequency
-          @current_synth.waveform = waveform
-          @current_synth.attack = attack
-          @current_synth.decay = decay
-          @current_synth.release = release
-        end
+        handle_gate_on
       else
-        @current_synth&.release!
+        handle_gate_off
       end
     end
 
@@ -47,6 +28,7 @@ module Sidtool
     end
 
     private
+
     def gate
       @control_register & 1 == 1
     end
@@ -61,22 +43,61 @@ module Sidtool
       return :pulse if @control_register & 64 != 0
       return :noise if @control_register & 128 != 0
       STDERR.puts "Unknown waveform: #{@control_register}"
-      return :noise
+      :noise
     end
 
     def attack
-      # Approximated... should be multiplied by 1.000.000 / clock
       convert_attack(@attack_decay >> 4)
     end
 
     def decay
-      # Approximated... should be multiplied by 1.000.000 / clock
       convert_decay_or_release(@attack_decay & 0xF)
     end
 
     def release
-      # Approximated... should be multiplied by 1.000.000 / clock
-      convert_decay_or_release(@sustain_release >> 4)
+      convert_decay_or_release(@sustain_release & 0xF)
+    end
+
+    def handle_gate_on
+      if @current_synth&.released?
+        @current_synth.stop!
+        @current_synth = nil
+      end
+
+      if frequency > 0
+        if !@current_synth
+          @current_synth = Synth.new(STATE.current_frame)
+          @synths << @current_synth
+          @previous_midi_note = nil
+        end
+        update_synth_properties
+      end
+    end
+
+    def handle_gate_off
+      @current_synth&.release!
+    end
+
+    def update_synth_properties
+      midi_note = frequency_to_midi(frequency)
+      if midi_note != @previous_midi_note
+        handle_midi_note_change(midi_note)
+        @previous_midi_note = midi_note
+      end
+
+      @current_synth.waveform = waveform
+      @current_synth.attack = attack
+      @current_synth.decay = decay
+      @current_synth.release = release
+    end
+
+    def handle_midi_note_change(midi_note)
+      # Implement logic for handling MIDI note changes, including slide detection
+    end
+
+    def frequency_to_midi(frequency)
+      midi_note = 69 + 12 * Math.log2(frequency / 440.0)
+      midi_note.round
     end
 
     def convert_attack(attack)
