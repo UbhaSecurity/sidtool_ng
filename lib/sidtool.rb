@@ -13,5 +13,9 @@ module Sidtool
   FRAMES_PER_SECOND = 50.0
   CLOCK_FREQUENCY = 985248.0
 
+  # Constants for slide detection and handling
+  SLIDE_THRESHOLD = 60 # Adjust as needed
+  SLIDE_DURATION_FRAMES = 20 # Adjust as needed
+
   STATE = State.new
 end
